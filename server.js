@@ -25,12 +25,38 @@ function asObjectId(id) {
   }
 }
 
+function calculateTrailLengthKm(latlngs) {
+  if (!Array.isArray(latlngs) || latlngs.length < 2) return 0;
+
+  const earthRadiusKm = 6371.0088;
+  let lengthKm = 0;
+
+  for (let index = 1; index < latlngs.length; index += 1) {
+    const previous = latlngs[index - 1];
+    const current = latlngs[index];
+    if (!Array.isArray(previous) || !Array.isArray(current) || previous.length < 2 || current.length < 2) continue;
+
+    const previousLat = Number(previous[0]) * Math.PI / 180;
+    const currentLat = Number(current[0]) * Math.PI / 180;
+    const deltaLat = currentLat - previousLat;
+    const deltaLng = (Number(current[1]) - Number(previous[1])) * Math.PI / 180;
+    const haversine = Math.sin(deltaLat / 2) ** 2 +
+      Math.cos(previousLat) * Math.cos(currentLat) * Math.sin(deltaLng / 2) ** 2;
+
+    if (Number.isFinite(haversine)) {
+      lengthKm += 2 * earthRadiusKm * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+    }
+  }
+
+  return Math.round(lengthKm * 100) / 100;
+}
+
 /* ---------------- TRAILS ---------------- */
 
 app.get('/api/trails', async (req, res) => {
   try {
     const docs = await db.collection('trails').find().toArray();
-    res.json(docs.map(serialize));
+    res.json(docs.map(doc => serialize({ ...doc, lengthKm: calculateTrailLengthKm(doc.latlngs) })));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Errore nel leggere i sentieri.' });
@@ -45,7 +71,7 @@ app.post('/api/trails', async (req, res) => {
     }
     const doc = { name, date, desc: desc || '', color: color || '#A8542E', latlngs, createdAt: new Date() };
     const result = await db.collection('trails').insertOne(doc);
-    res.json(serialize({ _id: result.insertedId, ...doc }));
+    res.json(serialize({ _id: result.insertedId, ...doc, lengthKm: calculateTrailLengthKm(latlngs) }));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Errore nel salvare il sentiero.' });

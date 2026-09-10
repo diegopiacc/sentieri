@@ -261,7 +261,11 @@
   var pendingLatLng = null;
   var currentTrailColor = '#A8542E';
 
-  var COLORS = ['#A8542E', '#3F5B3F', '#4E6E8C', '#6B4E71', '#B98B2E'];
+  var COLORS = [ 
+    '#FF00FF', '#8000FF', '#FF8000',
+    '#0000FF', '#FF8000',
+    '#007FFF', '#FF0100'
+  ];
 
   var map = L.map('map', { zoomControl: true }).setView([44.492, 11.144], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -286,6 +290,15 @@
     var p = dateStr.split('-');
     if (p.length !== 3) return dateStr;
     return p[2] + '/' + p[1] + '/' + p[0];
+  }
+  function sortByDateDesc(a, b){
+    if (!a.date && !b.date) return 0;
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return b.date.localeCompare(a.date);
+  }
+  function formatTrailLength(lengthKm){
+    return Number.isFinite(lengthKm) ? lengthKm.toFixed(2) + ' km' : '';
   }
   function showToast(msg){
     var t = document.getElementById('toast');
@@ -676,13 +689,14 @@
       el.innerHTML = '<div class="empty-state"><div class="glyph">🥾</div><p>Nessun sentiero ancora.<br>Traccia il primo con "Nuovo sentiero".</p></div>';
       return;
     }
-    var sorted = trails.slice().sort(function(a,b){ return b.date.localeCompare(a.date); });
+    var sorted = trails.slice().sort(sortByDateDesc);
     el.innerHTML = '';
     sorted.forEach(function(t){
       var card = document.createElement('div');
       card.className = 'card';
       card.style.borderLeftColor = t.color;
       card.innerHTML = '<div class="card-top"><span class="card-title">' + escapeHtml(t.name) + '</span><span class="card-date">' + formatDateIt(t.date) + '</span></div>' +
+        '<div class="card-desc">' + formatTrailLength(t.lengthKm) + '</div>' +
         (t.desc ? '<div class="card-desc">' + escapeHtml(t.desc) + '</div>' : '');
       card.addEventListener('click', function(){
         var layer = trailLayers[t.id];
@@ -699,7 +713,7 @@
       el.innerHTML = '<div class="empty-state"><div class="glyph">📍</div><p>Nessun punto salvato ancora.<br>Aggiungine uno con "Nuovo punto".</p></div>';
       return;
     }
-    var sorted = points.slice().sort(function(a,b){ return b.date.localeCompare(a.date); });
+    var sorted = points.slice().sort(sortByDateDesc);
     el.innerHTML = '';
     sorted.forEach(function(p){
       var card = document.createElement('div');
