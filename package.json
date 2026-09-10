@@ -1,0 +1,13 @@
+{
+  "name": "sentieri-app",
+  "version": "1.0.0",
+  "description": "Webapp locale per tracciare sentieri e punti salienti su mappa OpenStreetMap, con dati salvati su MongoDB locale.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "mongodb": "^6.9.0"
+  }
+}

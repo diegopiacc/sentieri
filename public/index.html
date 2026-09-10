@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Sentieri</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #F0ECDF;
+    --panel: #1E2A20;
+    --ink: #23271F;
+    --ink-soft: #6B6E5F;
+    --line: #DAD4C2;
+    --clay: #A8542E;
+    --clay-dark: #8A4423;
+    --pine: #3F5B3F;
+    --pine-light: #6E8F6A;
+    --white: #FFFFFF;
+    --card-bg: #FBFAF5;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ height:100%; margin:0; }
+  body{ font-family: 'IBM Plex Sans', sans-serif; color: var(--ink); background: var(--bg); overflow: hidden; }
+  h1,h2,h3,.serif{ font-family: 'Fraunces', serif; }
+  .app{ display:flex; height:100vh; width:100vw; }
+
+  .sidebar{ width: 380px; min-width: 380px; background: var(--bg); display:flex; flex-direction:column; border-right: 1px solid var(--line); z-index: 500; }
+  .sidebar-head{ background: var(--panel); color: #EFEAD9; padding: 22px 20px 18px; }
+  .sidebar-head h1{ margin:0 0 2px; font-size: 26px; font-weight: 600; }
+  .sidebar-head p{ margin:0; font-size: 12.5px; color: #B7BFAE; font-style: italic; font-family: 'Fraunces', serif; }
+
+  .search-row{ padding: 12px 16px; border-bottom: 1px solid var(--line); position: relative; }
+  .search-row input{ width:100%; padding: 9px 12px; border-radius: 7px; border: 1px solid var(--line); background: var(--white); font-family: 'IBM Plex Sans', sans-serif; font-size: 13.5px; color: var(--ink); }
+  .search-row input:focus{ outline: 2px solid var(--pine-light); outline-offset: 1px; }
+  .search-results{ position:absolute; left:16px; right:16px; top: 48px; background: var(--white); border: 1px solid var(--line); border-radius: 7px; box-shadow: 0 6px 16px rgba(0,0,0,0.12); max-height: 220px; overflow-y:auto; display:none; }
+  .search-results div{ padding: 9px 12px; font-size: 13px; cursor:pointer; border-bottom: 1px solid var(--line); }
+  .search-results div:last-child{ border-bottom:none; }
+  .search-results div:hover{ background: var(--bg); }
+
+  .tabs{ display:flex; border-bottom: 1px solid var(--line); }
+  .tab{ flex:1; padding: 12px 0; text-align:center; font-size: 13.5px; font-weight: 600; color: var(--ink-soft); cursor:pointer; border-bottom: 2px solid transparent; background:none; border-top:none; border-left:none; border-right:none; font-family: 'IBM Plex Sans', sans-serif; }
+  .tab.active{ color: var(--clay); border-bottom-color: var(--clay); }
+
+  .toolbar{ padding: 12px 16px; display:flex; gap: 8px; }
+  .btn{ font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 7px; border: none; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition: transform 0.05s ease; }
+  .btn:active{ transform: scale(0.97); }
+  .btn-primary{ background: var(--pine); color: #fff; }
+  .btn-primary:hover{ background: #364d36; }
+  .btn-clay{ background: var(--clay); color: #fff; }
+  .btn-clay:hover{ background: var(--clay-dark); }
+  .btn-ghost{ background: transparent; color: var(--ink-soft); border: 1px solid var(--line); }
+  .btn-ghost:hover{ background: var(--white); }
+  .btn-full{ flex:1; justify-content:center; }
+  .btn-danger-text{ color:#9A4A3A; background:transparent; border:none; cursor:pointer; font-size:12px; font-family:'IBM Plex Sans',sans-serif; }
+  .btn-danger-text:hover{ text-decoration: underline; }
+
+  .list{ flex:1; overflow-y:auto; padding: 6px 12px 16px; }
+  .empty-state{ margin-top: 40px; text-align:center; color: var(--ink-soft); padding: 0 24px; }
+  .empty-state .glyph{ font-size: 30px; margin-bottom:8px; }
+  .empty-state p{ font-size: 13.5px; line-height:1.5; margin:0; }
+
+  .card{ background: var(--card-bg); border: 1px solid var(--line); border-left: 4px solid var(--pine); border-radius: 6px; padding: 11px 13px; margin-bottom: 9px; cursor:pointer; }
+  .card:hover{ background: var(--white); }
+  .card-top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .card-title{ font-weight:600; font-size: 14.5px; font-family:'Fraunces', serif; }
+  .card-date{ font-size: 11px; color: var(--ink-soft); white-space:nowrap; }
+  .card-desc{ font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; line-height:1.4; }
+  .card-thumb{ width:100%; height:100px; object-fit:cover; border-radius:4px; margin-top:7px; display:block; }
+
+  .sidebar-footer{ padding: 9px 16px; font-size: 10.5px; color: var(--ink-soft); border-top: 1px solid var(--line); line-height:1.4; }
+  .conn-dot{ display:inline-block; width:7px; height:7px; border-radius:50%; background:#B5572E; margin-right:5px; vertical-align:middle; }
+  .conn-dot.ok{ background:#5C8A5C; }
+
+  .sidebar-toggle{ display:none; position: fixed; top: 14px; left: 14px; z-index: 900; background: var(--panel); color:#fff; border:none; width:40px; height:40px; border-radius: 8px; font-size: 18px; cursor:pointer; box-shadow: 0 3px 10px rgba(0,0,0,0.25); }
+
+  .map-wrap{ flex:1; position:relative; }
+  #map{ height:100%; width:100%; background:#dfe7dc; }
+
+  .draw-banner{ position:absolute; top: 16px; left:50%; transform: translateX(-50%); background: var(--panel); color:#fff; padding: 10px 16px; border-radius: 9px; z-index: 1000; display:none; align-items:center; gap: 12px; font-size: 13px; box-shadow: 0 6px 18px rgba(0,0,0,0.25); max-width: 90%; }
+  .draw-banner.show{ display:flex; }
+  .draw-banner .btn{ padding:6px 11px; font-size:12px; }
+
+  .overlay{ position:fixed; inset:0; background: rgba(20,24,17,0.45); display:none; align-items:center; justify-content:center; z-index: 2000; padding: 20px; }
+  .overlay.show{ display:flex; }
+  .modal{ background: var(--bg); width: 420px; max-width: 100%; max-height: 88vh; overflow-y: auto; border-radius: 10px; padding: 22px 22px 18px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+  .modal h2{ margin:0 0 14px; font-size:20px; }
+  .field{ margin-bottom: 14px; }
+  .field label{ display:block; font-size:12px; font-weight:600; color: var(--ink-soft); margin-bottom:5px; }
+  .field input[type=text], .field input[type=date], .field textarea{ width:100%; padding: 9px 11px; border-radius: 6px; border: 1px solid var(--line); font-family: 'IBM Plex Sans', sans-serif; font-size: 13.5px; background: var(--white); color: var(--ink); }
+  .field textarea{ resize: vertical; min-height: 60px; }
+  .field input:focus, .field textarea:focus{ outline: 2px solid var(--pine-light); outline-offset:1px; }
+
+  .swatches{ display:flex; gap:8px; }
+  .swatch{ width: 28px; height: 28px; border-radius: 50%; cursor:pointer; border: 2px solid transparent; }
+  .swatch.selected{ border-color: var(--ink); }
+
+  .photo-drop{ border: 1.5px dashed var(--line); border-radius: 8px; padding: 14px; text-align:center; cursor:pointer; font-size: 12.5px; color: var(--ink-soft); background: var(--white); }
+  .photo-drop:hover{ background: var(--bg); }
+  .photo-preview{ margin-top:10px; position:relative; display:inline-block; }
+  .photo-preview img{ max-width:100%; max-height:160px; border-radius:6px; display:block; }
+  .photo-remove{ position:absolute; top:-8px; right:-8px; background: var(--clay); color:#fff; border:none; width:22px; height:22px; border-radius:50%; cursor:pointer; font-size:12px; }
+
+  .modal-actions{ display:flex; justify-content: space-between; align-items:center; margin-top: 18px; }
+
+  .leaflet-popup-content{ margin: 12px 14px; min-width: 190px; }
+  .pop-title{ font-family:'Fraunces', serif; font-weight:600; font-size:15px; margin-bottom:2px; }
+  .pop-date{ font-size:11px; color: var(--ink-soft); margin-bottom:6px; }
+  .pop-desc{ font-size:12.5px; line-height:1.4; margin-bottom:6px; }
+  .pop-photo{ width:100%; max-height:130px; object-fit:cover; border-radius:5px; margin-bottom:6px; cursor:pointer; }
+  .pop-actions{ display:flex; gap:10px; margin-top:4px; }
+  .pop-actions span{ font-size:11.5px; cursor:pointer; color: var(--pine); font-weight:600; }
+  .pop-actions span.del{ color:#9A4A3A; }
+
+  .poi-icon{ width: 22px; height:22px; background: var(--pine); border: 2px solid #fff; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); box-shadow: 0 2px 5px rgba(0,0,0,0.35); }
+
+  .lightbox{ position:fixed; inset:0; background: rgba(10,12,8,0.88); display:none; align-items:center; justify-content:center; z-index:3000; padding: 30px; }
+  .lightbox.show{ display:flex; }
+  .lightbox img{ max-width:100%; max-height:100%; border-radius:6px; }
+  .lightbox-close{ position:absolute; top:18px; right:22px; color:#fff; font-size:26px; background:none; border:none; cursor:pointer; }
+
+  .toast{ position:fixed; bottom:22px; left:50%; transform: translateX(-50%); background: var(--panel); color:#fff; padding: 10px 18px; border-radius:8px; font-size:13px; z-index: 4000; opacity:0; transition: opacity 0.25s ease; box-shadow: 0 6px 18px rgba(0,0,0,0.3); }
+  .toast.show{ opacity:1; }
+
+  @media (max-width: 780px){
+    .sidebar{ position: fixed; top:0; left:0; bottom:0; transform: translateX(-100%); transition: transform 0.25s ease; box-shadow: 8px 0 24px rgba(0,0,0,0.25); }
+    .sidebar.open{ transform: translateX(0); }
+    .sidebar-toggle{ display:block; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+      <h1>Sentieri</h1>
+      <p>i nostri cammini, segnati a mano</p>
+    </div>
+
+    <div class="search-row">
+      <input type="text" id="searchInput" placeholder="Cerca un luogo sulla mappa…" autocomplete="off">
+      <div class="search-results" id="searchResults"></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="trails">Sentieri</button>
+      <button class="tab" data-tab="points">Punti</button>
+    </div>
+
+    <div class="toolbar" id="toolbarTrails">
+      <button class="btn btn-clay btn-full" id="btnNewTrail">✎ Nuovo sentiero</button>
+    </div>
+    <div class="toolbar" id="toolbarPoints" style="display:none;">
+      <button class="btn btn-primary btn-full" id="btnNewPoint">📍 Nuovo punto</button>
+    </div>
+
+    <div class="list" id="trailsList"></div>
+    <div class="list" id="pointsList" style="display:none;"></div>
+
+    <div class="sidebar-footer">
+      <span class="conn-dot" id="connDot"></span><span id="connText">Connessione al server…</span>
+    </div>
+  </div>
+
+  <div class="map-wrap">
+    <div class="draw-banner" id="drawBanner">
+      <span id="drawBannerText"></span>
+      <button class="btn btn-ghost" id="btnUndoVertex" style="display:none;">Annulla ultimo punto</button>
+      <button class="btn btn-clay" id="btnFinishDraw">Fine</button>
+      <button class="btn btn-ghost" id="btnCancelDraw">Annulla</button>
+    </div>
+    <div id="map"></div>
+  </div>
+</div>
+
+<div class="overlay" id="trailModal">
+  <div class="modal">
+    <h2 class="serif" id="trailModalTitle">Nuovo sentiero</h2>
+    <div class="field">
+      <label>Nome del sentiero</label>
+      <input type="text" id="trailName" placeholder="Es. Anello del Monte Sole">
+    </div>
+    <div class="field">
+      <label>Data</label>
+      <input type="date" id="trailDate">
+    </div>
+    <div class="field">
+      <label>Note</label>
+      <textarea id="trailDesc" placeholder="Difficoltà, fondo, dislivello, impressioni…"></textarea>
+    </div>
+    <div class="field">
+      <label>Colore</label>
+      <div class="swatches" id="trailSwatches"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-danger-text" id="trailModalCancel">Annulla</button>
+      <button class="btn btn-clay" id="trailModalSave">Salva sentiero</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="pointModal">
+  <div class="modal">
+    <h2 class="serif" id="pointModalTitle">Nuovo punto</h2>
+    <div class="field">
+      <label>Nome</label>
+      <input type="text" id="pointName" placeholder="Es. Belvedere sul lago">
+    </div>
+    <div class="field">
+      <label>Data</label>
+      <input type="date" id="pointDate">
+    </div>
+    <div class="field">
+      <label>Note</label>
+      <textarea id="pointDesc" placeholder="Cosa avete visto o vissuto qui…"></textarea>
+    </div>
+    <div class="field">
+      <label>Foto</label>
+      <div class="photo-drop" id="photoDrop">Tocca per scegliere una foto</div>
+      <input type="file" id="photoInput" accept="image/*" style="display:none;">
+      <div class="photo-preview" id="photoPreview" style="display:none;">
+        <img id="photoPreviewImg">
+        <button class="photo-remove" id="photoRemove">✕</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-danger-text" id="pointModalCancel">Annulla</button>
+      <button class="btn btn-primary" id="pointModalSave">Salva punto</button>
+    </div>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" id="lightboxClose">✕</button>
+  <img id="lightboxImg">
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+
+  var trails = [];
+  var points = [];
+  var trailLayers = {};
+  var pointLayers = {};
+
+  var drawing = null;
+  var tempLatLngs = [];
+  var tempPolyline = null;
+  var tempVertexMarkers = [];
+  var editingTrailId = null;
+  var editingPointId = null;
+  var pendingPhoto = null;
+  var pendingLatLng = null;
+  var currentTrailColor = '#A8542E';
+
+  var COLORS = ['#A8542E', '#3F5B3F', '#4E6E8C', '#6B4E71', '#B98B2E'];
+
+  var map = L.map('map', { zoomControl: true }).setView([44.492, 11.144], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  map.on('click', function(e){
+    if (drawing === 'trail'){ addTrailVertex(e.latlng); }
+    else if (drawing === 'point'){ finishPointClick(e.latlng); }
+  });
+
+  function escapeHtml(s){
+    if (!s) return '';
+    return s.replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function todayStr(){ return new Date().toISOString().slice(0,10); }
+  function formatDateIt(dateStr){
+    if (!dateStr) return '';
+    var p = dateStr.split('-');
+    if (p.length !== 3) return dateStr;
+    return p[2] + '/' + p[1] + '/' + p[0];
+  }
+  function showToast(msg){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2600);
+  }
+
+  async function api(path, opts){
+    var res = await fetch('/api/' + path, Object.assign({
+      headers: { 'Content-Type': 'application/json' }
+    }, opts || {}));
+    if (!res.ok){
+      var body = {};
+      try{ body = await res.json(); }catch(e){}
+      throw new Error(body.error || ('Errore ' + res.status));
+    }
+    return res.json();
+  }
+
+  async function loadAll(){
+    try{
+      trails = await api('trails');
+      document.getElementById('connDot').classList.add('ok');
+      document.getElementById('connText').textContent = 'Connesso al server locale';
+    }catch(e){
+      showToast('Impossibile contattare il server. È in esecuzione con MongoDB attivo?');
+      document.getElementById('connText').textContent = 'Server non raggiungibile';
+      trails = [];
+    }
+    try{
+      points = await api('points');
+    }catch(e){
+      points = [];
+    }
+
+    trails.forEach(renderTrailOnMap);
+    points.forEach(renderPointOnMap);
+    renderTrailsList();
+    renderPointsList();
+
+    if (trails.length || points.length){
+      var b = null;
+      trails.forEach(function(t){
+        var tb = L.polyline(t.latlngs).getBounds();
+        b = b ? b.extend(tb) : tb;
+      });
+      points.forEach(function(p){
+        b = b ? b.extend([p.lat,p.lng]) : L.latLngBounds([p.lat,p.lng],[p.lat,p.lng]);
+      });
+      if (b && b.isValid()) map.fitBounds(b, { padding:[40,40], maxZoom:15 });
+    }
+  }
+
+  document.querySelectorAll('.tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+      tab.classList.add('active');
+      var which = tab.dataset.tab;
+      document.getElementById('toolbarTrails').style.display = which === 'trails' ? 'flex' : 'none';
+      document.getElementById('toolbarPoints').style.display = which === 'points' ? 'flex' : 'none';
+      document.getElementById('trailsList').style.display = which === 'trails' ? 'block' : 'none';
+      document.getElementById('pointsList').style.display = which === 'points' ? 'block' : 'none';
+    });
+  });
+
+  document.getElementById('sidebarToggle').addEventListener('click', function(){
+    document.getElementById('sidebar').classList.toggle('open');
+  });
+
+  document.getElementById('btnNewTrail').addEventListener('click', function(){
+    if (drawing) return;
+    drawing = 'trail';
+    tempLatLngs = [];
+    tempVertexMarkers = [];
+    currentTrailColor = COLORS[0];
+    tempPolyline = L.polyline([], { color: currentTrailColor, weight: 4, dashArray: '7,7' }).addTo(map);
+    map.doubleClickZoom.disable();
+    document.getElementById('drawBannerText').textContent = 'Clicca sulla mappa per tracciare il sentiero, punto dopo punto.';
+    document.getElementById('btnUndoVertex').style.display = 'inline-flex';
+    document.getElementById('drawBanner').classList.add('show');
+    document.getElementById('sidebar').classList.remove('open');
+  });
+
+  function addTrailVertex(latlng){
+    tempLatLngs.push(latlng);
+    tempPolyline.setLatLngs(tempLatLngs);
+    var m = L.circleMarker(latlng, { radius:5, color:'#fff', weight:2, fillColor: currentTrailColor, fillOpacity:1 }).addTo(map);
+    tempVertexMarkers.push(m);
+  }
+
+  document.getElementById('btnUndoVertex').addEventListener('click', function(){
+    if (!tempLatLngs.length) return;
+    tempLatLngs.pop();
+    tempPolyline.setLatLngs(tempLatLngs);
+    var last = tempVertexMarkers.pop();
+    if (last) map.removeLayer(last);
+  });
+
+  document.getElementById('btnCancelDraw').addEventListener('click', cancelDrawing);
+
+  function cancelDrawing(){
+    if (tempPolyline){ map.removeLayer(tempPolyline); tempPolyline = null; }
+    tempVertexMarkers.forEach(function(m){ map.removeLayer(m); });
+    tempVertexMarkers = [];
+    tempLatLngs = [];
+    drawing = null;
+    map.doubleClickZoom.enable();
+    document.getElementById('drawBanner').classList.remove('show');
+    document.getElementById('btnUndoVertex').style.display = 'none';
+  }
+
+  document.getElementById('btnFinishDraw').addEventListener('click', function(){
+    if (drawing !== 'trail') return;
+    if (tempLatLngs.length < 2){
+      showToast('Servono almeno due punti per un sentiero.');
+      return;
+    }
+    openTrailModal(null);
+  });
+
+  var trailSwatchesEl = document.getElementById('trailSwatches');
+  COLORS.forEach(function(c){
+    var sw = document.createElement('div');
+    sw.className = 'swatch';
+    sw.style.background = c;
+    sw.dataset.color = c;
+    sw.addEventListener('click', function(){
+      document.querySelectorAll('#trailSwatches .swatch').forEach(function(s){ s.classList.remove('selected'); });
+      sw.classList.add('selected');
+      currentTrailColor = c;
+      if (tempPolyline) tempPolyline.setStyle({ color: c });
+    });
+    trailSwatchesEl.appendChild(sw);
+  });
+
+  function openTrailModal(trail){
+    editingTrailId = trail ? trail.id : null;
+    document.getElementById('trailModalTitle').textContent = trail ? 'Modifica sentiero' : 'Nuovo sentiero';
+    document.getElementById('trailName').value = trail ? trail.name : '';
+    document.getElementById('trailDate').value = trail ? trail.date : todayStr();
+    document.getElementById('trailDesc').value = trail ? (trail.desc || '') : '';
+    var col = trail ? trail.color : currentTrailColor;
+    currentTrailColor = col;
+    document.querySelectorAll('#trailSwatches .swatch').forEach(function(s){
+      s.classList.toggle('selected', s.dataset.color === col);
+    });
+    document.getElementById('trailModal').classList.add('show');
+  }
+
+  document.getElementById('trailModalCancel').addEventListener('click', function(){
+    document.getElementById('trailModal').classList.remove('show');
+  });
+
+  document.getElementById('trailModalSave').addEventListener('click', async function(){
+    var name = document.getElementById('trailName').value.trim();
+    if (!name){ showToast('Dai un nome al sentiero.'); return; }
+    var date = document.getElementById('trailDate').value || todayStr();
+    var desc = document.getElementById('trailDesc').value.trim();
+
+    if (editingTrailId){
+      try{
+        await api('trails/' + editingTrailId, { method: 'PUT', body: JSON.stringify({ name: name, date: date, desc: desc, color: currentTrailColor }) });
+        var t = trails.find(function(x){ return x.id === editingTrailId; });
+        t.name = name; t.date = date; t.desc = desc; t.color = currentTrailColor;
+        if (trailLayers[t.id]){ trailLayers[t.id].setStyle({ color: t.color }); trailLayers[t.id].setPopupContent(trailPopupHtml(t)); }
+        renderTrailsList();
+        document.getElementById('trailModal').classList.remove('show');
+        showToast('Sentiero aggiornato.');
+      }catch(e){ showToast('Errore: ' + e.message); }
+      return;
+    }
+
+    try{
+      var saved = await api('trails', { method: 'POST', body: JSON.stringify({
+        name: name, date: date, desc: desc, color: currentTrailColor,
+        latlngs: tempLatLngs.map(function(ll){ return [ll.lat, ll.lng]; })
+      }) });
+      trails.push(saved);
+      renderTrailOnMap(saved);
+      renderTrailsList();
+
+      tempVertexMarkers.forEach(function(m){ map.removeLayer(m); });
+      tempVertexMarkers = [];
+      if (tempPolyline){ map.removeLayer(tempPolyline); tempPolyline = null; }
+      tempLatLngs = [];
+      drawing = null;
+      map.doubleClickZoom.enable();
+      document.getElementById('drawBanner').classList.remove('show');
+      document.getElementById('btnUndoVertex').style.display = 'none';
+      document.getElementById('trailModal').classList.remove('show');
+      showToast('Sentiero salvato.');
+    }catch(e){ showToast('Errore nel salvataggio: ' + e.message); }
+  });
+
+  function renderTrailOnMap(trail){
+    var layer = L.polyline(trail.latlngs, { color: trail.color, weight: 5, opacity: 0.9, lineJoin:'round' }).addTo(map);
+    layer.bindPopup(trailPopupHtml(trail));
+    layer.on('popupopen', bindPopupActions);
+    trailLayers[trail.id] = layer;
+  }
+
+  function trailPopupHtml(trail){
+    return '<div class="pop-title">' + escapeHtml(trail.name) + '</div>' +
+      '<div class="pop-date">' + formatDateIt(trail.date) + '</div>' +
+      (trail.desc ? '<div class="pop-desc">' + escapeHtml(trail.desc) + '</div>' : '') +
+      '<div class="pop-actions">' +
+        '<span data-action="edit-trail" data-id="' + trail.id + '">Modifica</span>' +
+        '<span class="del" data-action="del-trail" data-id="' + trail.id + '">Elimina</span>' +
+      '</div>';
+  }
+
+  function bindPopupActions(){
+    document.querySelectorAll('[data-action]').forEach(function(el){
+      if (el._bound) return;
+      el._bound = true;
+      el.addEventListener('click', function(){
+        var id = el.dataset.id;
+        var action = el.dataset.action;
+        if (action === 'edit-trail'){ openTrailModal(trails.find(function(x){return x.id===id;})); }
+        if (action === 'del-trail'){ deleteTrail(id); }
+        if (action === 'edit-point'){ openPointModal(points.find(function(x){return x.id===id;})); }
+        if (action === 'del-point'){ deletePoint(id); }
+        if (action === 'view-photo'){ openLightbox(el.dataset.src); }
+      });
+    });
+  }
+
+  async function deleteTrail(id){
+    if (!confirm('Eliminare questo sentiero?')) return;
+    try{
+      await api('trails/' + id, { method: 'DELETE' });
+      if (trailLayers[id]) { map.removeLayer(trailLayers[id]); delete trailLayers[id]; }
+      trails = trails.filter(function(t){ return t.id !== id; });
+      renderTrailsList();
+      showToast('Sentiero eliminato.');
+    }catch(e){ showToast('Errore: ' + e.message); }
+  }
+
+  document.getElementById('btnNewPoint').addEventListener('click', function(){
+    if (drawing) return;
+    drawing = 'point';
+    document.getElementById('drawBannerText').textContent = 'Clicca sulla mappa dove vuoi posizionare il punto.';
+    document.getElementById('btnUndoVertex').style.display = 'none';
+    document.getElementById('drawBanner').classList.add('show');
+    document.getElementById('sidebar').classList.remove('open');
+  });
+
+  function finishPointClick(latlng){
+    pendingLatLng = latlng;
+    drawing = null;
+    document.getElementById('drawBanner').classList.remove('show');
+    openPointModal(null);
+  }
+
+  var photoDrop = document.getElementById('photoDrop');
+  var photoInput = document.getElementById('photoInput');
+  photoDrop.addEventListener('click', function(){ photoInput.click(); });
+  photoInput.addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if (!file) return;
+    compressImage(file, function(dataUrl){
+      pendingPhoto = dataUrl;
+      document.getElementById('photoPreviewImg').src = dataUrl;
+      document.getElementById('photoPreview').style.display = 'inline-block';
+      photoDrop.style.display = 'none';
+    });
+  });
+  document.getElementById('photoRemove').addEventListener('click', function(){
+    pendingPhoto = null;
+    photoInput.value = '';
+    document.getElementById('photoPreview').style.display = 'none';
+    photoDrop.style.display = 'block';
+  });
+
+  function compressImage(file, cb){
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      var img = new Image();
+      img.onload = function(){
+        var maxDim = 1280;
+        var w = img.width, h = img.height;
+        if (w > h && w > maxDim){ h = Math.round(h * maxDim / w); w = maxDim; }
+        else if (h >= w && h > maxDim){ w = Math.round(w * maxDim / h); h = maxDim; }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        cb(canvas.toDataURL('image/jpeg', 0.72));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function openPointModal(point){
+    editingPointId = point ? point.id : null;
+    pendingPhoto = point ? point.photo : null;
+    document.getElementById('pointModalTitle').textContent = point ? 'Modifica punto' : 'Nuovo punto';
+    document.getElementById('pointName').value = point ? point.name : '';
+    document.getElementById('pointDate').value = point ? point.date : todayStr();
+    document.getElementById('pointDesc').value = point ? (point.desc || '') : '';
+    photoInput.value = '';
+    if (pendingPhoto){
+      document.getElementById('photoPreviewImg').src = pendingPhoto;
+      document.getElementById('photoPreview').style.display = 'inline-block';
+      photoDrop.style.display = 'none';
+    } else {
+      document.getElementById('photoPreview').style.display = 'none';
+      photoDrop.style.display = 'block';
+    }
+    document.getElementById('pointModal').classList.add('show');
+  }
+
+  document.getElementById('pointModalCancel').addEventListener('click', function(){
+    document.getElementById('pointModal').classList.remove('show');
+    pendingLatLng = null;
+    map.doubleClickZoom.enable();
+  });
+
+  document.getElementById('pointModalSave').addEventListener('click', async function(){
+    var name = document.getElementById('pointName').value.trim();
+    if (!name){ showToast('Dai un nome al punto.'); return; }
+    var date = document.getElementById('pointDate').value || todayStr();
+    var desc = document.getElementById('pointDesc').value.trim();
+
+    if (editingPointId){
+      try{
+        await api('points/' + editingPointId, { method: 'PUT', body: JSON.stringify({ name: name, date: date, desc: desc, photo: pendingPhoto }) });
+        var p = points.find(function(x){ return x.id === editingPointId; });
+        p.name = name; p.date = date; p.desc = desc; p.photo = pendingPhoto;
+        if (pointLayers[p.id]) pointLayers[p.id].setPopupContent(pointPopupHtml(p));
+        renderPointsList();
+        document.getElementById('pointModal').classList.remove('show');
+        showToast('Punto aggiornato.');
+      }catch(e){ showToast('Errore: ' + e.message); }
+      return;
+    }
+
+    if (!pendingLatLng){ showToast('Qualcosa è andato storto con la posizione.'); return; }
+    try{
+      var saved = await api('points', { method: 'POST', body: JSON.stringify({
+        name: name, date: date, desc: desc, photo: pendingPhoto, lat: pendingLatLng.lat, lng: pendingLatLng.lng
+      }) });
+      points.push(saved);
+      renderPointOnMap(saved);
+      renderPointsList();
+      pendingLatLng = null;
+      map.doubleClickZoom.enable();
+      document.getElementById('pointModal').classList.remove('show');
+      showToast('Punto salvato.');
+    }catch(e){ showToast('Errore nel salvataggio: ' + e.message); }
+  });
+
+  var poiIcon = L.divIcon({ className: '', html: '<div class="poi-icon"></div>', iconSize:[22,22], iconAnchor:[11,20] });
+
+  function renderPointOnMap(point){
+    var marker = L.marker([point.lat, point.lng], { icon: poiIcon }).addTo(map);
+    marker.bindPopup(pointPopupHtml(point));
+    marker.on('popupopen', bindPopupActions);
+    pointLayers[point.id] = marker;
+  }
+
+  function pointPopupHtml(point){
+    return (point.photo ? '<img class="pop-photo" src="' + point.photo + '" data-action="view-photo" data-src="' + point.photo + '">' : '') +
+      '<div class="pop-title">' + escapeHtml(point.name) + '</div>' +
+      '<div class="pop-date">' + formatDateIt(point.date) + '</div>' +
+      (point.desc ? '<div class="pop-desc">' + escapeHtml(point.desc) + '</div>' : '') +
+      '<div class="pop-actions">' +
+        '<span data-action="edit-point" data-id="' + point.id + '">Modifica</span>' +
+        '<span class="del" data-action="del-point" data-id="' + point.id + '">Elimina</span>' +
+      '</div>';
+  }
+
+  async function deletePoint(id){
+    if (!confirm('Eliminare questo punto?')) return;
+    try{
+      await api('points/' + id, { method: 'DELETE' });
+      if (pointLayers[id]) { map.removeLayer(pointLayers[id]); delete pointLayers[id]; }
+      points = points.filter(function(p){ return p.id !== id; });
+      renderPointsList();
+      showToast('Punto eliminato.');
+    }catch(e){ showToast('Errore: ' + e.message); }
+  }
+
+  function renderTrailsList(){
+    var el = document.getElementById('trailsList');
+    if (!trails.length){
+      el.innerHTML = '<div class="empty-state"><div class="glyph">🥾</div><p>Nessun sentiero ancora.<br>Traccia il primo con "Nuovo sentiero".</p></div>';
+      return;
+    }
+    var sorted = trails.slice().sort(function(a,b){ return b.date.localeCompare(a.date); });
+    el.innerHTML = '';
+    sorted.forEach(function(t){
+      var card = document.createElement('div');
+      card.className = 'card';
+      card.style.borderLeftColor = t.color;
+      card.innerHTML = '<div class="card-top"><span class="card-title">' + escapeHtml(t.name) + '</span><span class="card-date">' + formatDateIt(t.date) + '</span></div>' +
+        (t.desc ? '<div class="card-desc">' + escapeHtml(t.desc) + '</div>' : '');
+      card.addEventListener('click', function(){
+        var layer = trailLayers[t.id];
+        if (layer){ map.fitBounds(layer.getBounds(), { padding:[50,50] }); layer.openPopup(); }
+        document.getElementById('sidebar').classList.remove('open');
+      });
+      el.appendChild(card);
+    });
+  }
+
+  function renderPointsList(){
+    var el = document.getElementById('pointsList');
+    if (!points.length){
+      el.innerHTML = '<div class="empty-state"><div class="glyph">📍</div><p>Nessun punto salvato ancora.<br>Aggiungine uno con "Nuovo punto".</p></div>';
+      return;
+    }
+    var sorted = points.slice().sort(function(a,b){ return b.date.localeCompare(a.date); });
+    el.innerHTML = '';
+    sorted.forEach(function(p){
+      var card = document.createElement('div');
+      card.className = 'card';
+      card.style.borderLeftColor = 'var(--pine)';
+      card.innerHTML = '<div class="card-top"><span class="card-title">' + escapeHtml(p.name) + '</span><span class="card-date">' + formatDateIt(p.date) + '</span></div>' +
+        (p.desc ? '<div class="card-desc">' + escapeHtml(p.desc) + '</div>' : '') +
+        (p.photo ? '<img class="card-thumb" src="' + p.photo + '">' : '');
+      card.addEventListener('click', function(){
+        map.setView([p.lat, p.lng], 16);
+        var layer = pointLayers[p.id];
+        if (layer) layer.openPopup();
+        document.getElementById('sidebar').classList.remove('open');
+      });
+      el.appendChild(card);
+    });
+  }
+
+  function openLightbox(src){
+    document.getElementById('lightboxImg').src = src;
+    document.getElementById('lightbox').classList.add('show');
+  }
+  document.getElementById('lightboxClose').addEventListener('click', function(){
+    document.getElementById('lightbox').classList.remove('show');
+  });
+  document.getElementById('lightbox').addEventListener('click', function(e){
+    if (e.target.id === 'lightbox') document.getElementById('lightbox').classList.remove('show');
+  });
+
+  var searchInput = document.getElementById('searchInput');
+  var searchResults = document.getElementById('searchResults');
+  var searchTimer = null;
+  searchInput.addEventListener('input', function(){
+    clearTimeout(searchTimer);
+    var q = searchInput.value.trim();
+    if (q.length < 3){ searchResults.style.display = 'none'; return; }
+    searchTimer = setTimeout(function(){ runSearch(q); }, 450);
+  });
+  async function runSearch(q){
+    try{
+      var res = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&q=' + encodeURIComponent(q));
+      var data = await res.json();
+      if (!data.length){ searchResults.style.display = 'none'; return; }
+      searchResults.innerHTML = '';
+      data.forEach(function(r){
+        var div = document.createElement('div');
+        div.textContent = r.display_name;
+        div.addEventListener('click', function(){
+          map.setView([parseFloat(r.lat), parseFloat(r.lon)], 14);
+          searchResults.style.display = 'none';
+          searchInput.value = '';
+        });
+        searchResults.appendChild(div);
+      });
+      searchResults.style.display = 'block';
+    }catch(e){ searchResults.style.display = 'none'; }
+  }
+  document.addEventListener('click', function(e){
+    if (!searchResults.contains(e.target) && e.target !== searchInput) searchResults.style.display = 'none';
+  });
+
+  loadAll();
+
+})();
+</script>
+</body>
+</html>
